@@ -1,3 +1,5 @@
+import { e } from "unocss";
+
 /**
  * config 自定义配置项
  * @param withoutCheck 不使用默认的接口状态校验，直接返回 response
@@ -85,18 +87,16 @@ async function resultReduction(response: any, request: any) {
 }
 
 async function useRequest(method: string, path: string, data: { [prop: string]: any }, config: any = {}): Promise<{ data: any, code: number }> {
-    // if (!config.hideLoading) commonStore.showLoading = true;
-    const token = useUser().userInfo;
-    console.log('token: ', token);
+    if (!useLoading().value) globalVar.$loadingBar.start(); useLoading().value = true;
+    const token = useUserInfo().value.token;
     let configTemp = Object.assign(
         {
-            header: {
-                "Content-Type": config.formData
-                    ? "application/x-www-form-urlencoded" :
-                    config.fileUpload ? 'multipart/form-data;'
-                        : "application/json;charset=utf-8",
+            headers: {
+                // "Content-Type": config.formData
+                //     ? "application/x-www-form-urlencoded" :
+                //     config.fileUpload ? 'multipart/form-data;'
+                //         : "application/json;charset=utf-8",
                 // authorization: `Bearer ${token}`,
-                token,
                 Authorization: token
             },
         },
@@ -115,53 +115,31 @@ async function useRequest(method: string, path: string, data: { [prop: string]: 
     }
     // path = (configTemp?.proxy ? process.env.VITE_baseUrl : '') + path;
     path = (configTemp?.proxy ? '/gateway' : '') + path;
+    console.log('path: ', path);
     let myInit = {
-        method:'POST',
-        ...configDefault,
+        method,
         ...configTemp,
-        body: config.fileUpload ? data : (config.formData ? new URLSearchParams(data) : JSON.stringify(data))
+        body: config.fileUpload ? data : (config.formData ? new URLSearchParams(data) : data)
     };
-    if (method === 'GET') delete myInit.body
     let params = '';
+    if (method === 'GET') delete myInit.body
     if (data && (method === 'GET' || configTemp.joinUrl)) {
         // 对象转url参数
         params = (JSON.stringify(data) as any)?.replace(/:/g, '=')?.replace(/"/g, '')?.replace(/,/g, '&')?.match(/\{([^)]*)\}/)[1];
     }
     return new Promise((resolve, reject) => {
-        $fetch({ url: params ? `${path}${params ? "?" : ""}${params}` : path, ...myInit }).then(async response => {
-            console.log('response: ', response);
-            // TODO: 这里是复制一份结果处理，在这里可以做一些操作
-            // commonStore.showLoading = false;
-            // const res: any =await resultReduction(response,configTemp);
-            // if ((response.statusCode == 401 || res.code == 401) && !configTemp.withoutCheck) {
-            //     const { hash, pathname } = location;
-            //     if (!hash.includes('returnUrl')) {
-            //         location.href = pathname + '#/login?returnUrl=' + encodeURIComponent(hash);;
-            //     }
-            //     return resolve(res);
-            // }
-            // if (res.code == 403) window.history.go(-1);
-            // // HTTP 状态码 2xx 状态入口，data.code 为 200 表示数据正确，无任何错误
-            // if (response.statusCode >= 200 && response.statusCode < 300 && res.code != 401) {
-            //     if (res.code !== 0 && res.message && !configTemp.withoutCheck) {
-            //         window.$message.error(res.code !== 500 ? res.message : '接口异常，请联系管理员!');
-            //     }
-            //     // if (configTemp.cached) {
-            //     //     const requestKey = generateReqKey(configTemp)
-            //     //     db.set(requestKey, deepClone(res), configTemp.catchExpires)
-            //     // }
-            //     return resolve(res);
-            // } else {
-            //     // 非 2xx 状态入口
-            //     if (configDefault.withoutCheck) return resolve(response as any);
-            //     // return Promise.reject(response);
-            //     if (res.code !== 0 && res.code !== 500 && res.message) {
-            //         window.$message.error(res.message);
-            //     }
-
-            // }
+        $fetch(params ? `${path}${params ? "?" : ""}${params}` : path, myInit).then(async (res: any) => {
+            if (res.code == 401 || res.code == 0) {
+                globalVar.$loadingBar.finish()
+                useLoading().value = false;
+                if (res.code == 401) return navigateTo('/login')
+                if (res.code == 0) resolve(res)
+            }
+            else globalVar.$message.error(res.message);
+             
         }).catch(err => {
-            console.log('err: ', err);
+            useLoading().value = false;
+            globalVar.$loadingBar.error()
             reject(err)
         })
     })
@@ -173,7 +151,7 @@ export function get(path = '', data = {}, config = {}) {
 
 // post请求方法使用封装
 export function post(path = '', data = {}, config = {}) {
-    return useRequest('POST', path, data, config);
+    return useRequest('post', path, data, config);
 }
 
 // put请求方法使用封装

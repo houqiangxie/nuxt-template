@@ -4,9 +4,11 @@
  * @Author: houqiangxie
  * @Date: 2023-11-08 09:59:42
  * @LastEditors: houqiangxie
- * @LastEditTime: 2023-11-08 14:39:26
+ * @LastEditTime: 2023-11-16 11:16:26
  */
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import Components from 'unplugin-vue-components/vite';
+import { NaiveUiResolver } from 'unplugin-vue-components/resolvers';
 export default defineNuxtConfig({
   devtools: { enabled: false },
   modules: ['@unocss/nuxt',],
@@ -27,4 +29,29 @@ export default defineNuxtConfig({
       },
     },
   },
+  build: {
+    transpile:
+      process.env.NODE_ENV === 'production'
+        ? [
+          'naive-ui',
+          'vueuc',
+          '@css-render/vue3-ssr',
+          '@juggle/resize-observer'
+        ]
+        : ['@juggle/resize-observer']
+  },
+  vite: {
+    optimizeDeps: {
+      include:
+        process.env.NODE_ENV === 'development'
+          ? ['naive-ui', 'vueuc', 'date-fns-tz/formatInTimeZone']
+          : []
+    },
+    plugins: [
+      Components({
+        dts: true,
+        resolvers: [NaiveUiResolver()], // Automatically register all components in the `components` directory
+      }),
+    ],
+  }
 })
